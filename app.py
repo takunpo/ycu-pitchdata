@@ -4,7 +4,7 @@ import datetime
 import os
 import json
 
-st.set_page_config(layout="wide", page_title="本格派・投球データ入力アプリ")
+st.set_page_config(layout="wide", page_title="投球データ入力アプリ")
 
 # ==========================================
 # 🔒 パスワード保護の仕組み
@@ -175,20 +175,17 @@ with col1:
         st.subheader("🎯 3. 対戦・投球入力（1球ごと）")
         
         st.write("▼ カウント (BSO)")
-        bso1, bso2, bso3 = st.columns(3)
-        with bso1:
-            balls = st.radio("B 🟢", ["0", "1", "2", "3"], horizontal=True)
-        with bso2:
-            strikes = st.radio("S 🟡", ["0", "1", "2"], horizontal=True)
-        with bso3:
-            outs = st.radio("O 🔴", ["0", "1", "2"], horizontal=True)
+        # 横並びの列（columns）を解除して、縦に並べる
+        balls = st.radio("B 🟢", ["0", "1", "2", "3"], horizontal=True)
+        strikes = st.radio("S 🟡", ["0", "1", "2"], horizontal=True)
+        outs = st.radio("O 🔴", ["0", "1", "2"], horizontal=True)
         
         st.write("▼ 投球内容")
         p_col1, p_col2, p_col3 = st.columns(3)
         with p_col1:
             pitch_type = st.selectbox("球種", ["FF(ストレート)", "FT(ツーシーム)", "SL(スライダー)", "FC(カット)", "CU(カーブ)", "FS(フォーク)", "CH(チェンジアップ)", "OT(その他)"])
         with p_col2:
-            pitch_speed = st.number_input("球速 (km/h)", min_value=50, max_value=200, value=130, step=1)
+            pitch_speed = st.number_input("球速 (km/h)", min_value=50, max_value=160, value=130, step=1)
         with p_col3:
             pitch_result = st.selectbox("投球結果", ["S(見逃し)", "SS(空振り)", "B(ボール)", "F(ファウル)", "BIP(インプレー)"])
         
