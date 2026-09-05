@@ -7,6 +7,25 @@ import json
 st.set_page_config(layout="wide", page_title="投球データ入力アプリ")
 
 # ==========================================
+# 🎨 UIデザインの最適化（縦幅を詰めるCSS）
+# ==========================================
+st.markdown("""
+<style>
+/* ラジオボタンのタイトルと選択肢を強制的に横並びにする */
+div[data-testid="stRadio"] {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+div[data-testid="stRadio"] > label {
+    margin-bottom: 0px !important;
+    margin-right: 15px;
+    min-width: 65px; /* B 🟢 などの文字幅を揃えて縦のラインを綺麗にする */
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
 # 🔒 パスワード保護の仕組み
 # ==========================================
 if "login" not in st.session_state:
@@ -24,7 +43,7 @@ if not st.session_state["login"]:
     st.stop() 
 # ==========================================
 
-st.title("⚾ チーム別フィルタ対応・一球速報システム")
+st.title("⚾ 一球速報システム")
 
 CSV_FILE = "pitch_log_v6.csv"
 DB_FILE = "teams_db.json"
@@ -175,7 +194,6 @@ with col1:
         st.subheader("🎯 3. 対戦・投球入力（1球ごと）")
         
         st.write("▼ カウント (BSO)")
-        # 横並びの列（columns）を解除して、縦に並べる
         balls = st.radio("B 🟢", ["0", "1", "2", "3"], horizontal=True)
         strikes = st.radio("S 🟡", ["0", "1", "2"], horizontal=True)
         outs = st.radio("O 🔴", ["0", "1", "2"], horizontal=True)
@@ -185,7 +203,7 @@ with col1:
         with p_col1:
             pitch_type = st.selectbox("球種", ["FF(ストレート)", "FT(ツーシーム)", "SL(スライダー)", "FC(カット)", "CU(カーブ)", "FS(フォーク)", "CH(チェンジアップ)", "OT(その他)"])
         with p_col2:
-            pitch_speed = st.number_input("球速 (km/h)", min_value=50, max_value=160, value=130, step=1)
+            pitch_speed = st.number_input("球速 (km/h)", min_value=50, max_value=200, value=130, step=1)
         with p_col3:
             pitch_result = st.selectbox("投球結果", ["S(見逃し)", "SS(空振り)", "B(ボール)", "F(ファウル)", "BIP(インプレー)"])
         
