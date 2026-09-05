@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import os
-import json # データをファイルに保存・読み込みするための仕組みを追加
+import json
 
 st.set_page_config(layout="wide", page_title="本格派・投球データ入力アプリ")
 
@@ -16,7 +16,7 @@ if not st.session_state["login"]:
     st.title("🔒 パスワードを入力してね")
     pwd = st.text_input("パスワード", type="password")
     if st.button("ログイン"):
-        if pwd == "ycujunko":  # パスワードを変更した場合はここも直してね
+        if pwd == "ycujunko": 
             st.session_state["login"] = True
             st.rerun()
         else:
@@ -26,10 +26,9 @@ if not st.session_state["login"]:
 
 st.title("⚾ チーム別フィルタ対応・一球速報システム")
 
-CSV_FILE = "pitch_log_v5.csv"
-DB_FILE = "teams_db.json" # 選手データを保存するファイル
+CSV_FILE = "pitch_log_v6.csv"
+DB_FILE = "teams_db.json"
 
-# 選手データの読み込み処理（ファイルがあれば読み込む、なければ空っぽ）
 if "teams_db" not in st.session_state:
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r", encoding="utf-8") as f:
@@ -37,7 +36,6 @@ if "teams_db" not in st.session_state:
     else:
         st.session_state["teams_db"] = {}
 
-# 選手データをファイルに保存する関数
 def save_teams_db():
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump(st.session_state["teams_db"], f, ensure_ascii=False, indent=4)
@@ -68,7 +66,7 @@ with col1:
                 if new_team:
                     if new_team not in st.session_state["teams_db"]:
                         st.session_state["teams_db"][new_team] = {"投手": [], "捕手": [], "野手": []}
-                        save_teams_db() # 変更を保存！
+                        save_teams_db()
                         st.success(f"チーム【{new_team}】を追加したよ！")
                         st.rerun()
                     else:
@@ -87,7 +85,7 @@ with col1:
                     if reg_name:
                         if reg_name not in st.session_state["teams_db"][reg_team][reg_position]:
                             st.session_state["teams_db"][reg_team][reg_position].append(reg_name)
-                            save_teams_db() # 変更を保存！
+                            save_teams_db()
                             st.success(f"{reg_team}の{reg_position}に【{reg_name}】を追加したよ！")
                             st.rerun()
                         else:
@@ -110,7 +108,7 @@ with col1:
                         del_name = st.selectbox("削除する選手", del_players)
                         if st.button("この選手を削除する"):
                             st.session_state["teams_db"][del_team][del_position].remove(del_name)
-                            save_teams_db() # 変更を保存！
+                            save_teams_db()
                             st.success(f"【{del_name}】を削除したよ。")
                             st.rerun()
                     else:
@@ -121,7 +119,7 @@ with col1:
                     st.warning(f"※チーム【{del_team_all}】と所属する全選手が消えます")
                     if st.button("このチームを完全に削除する"):
                         del st.session_state["teams_db"][del_team_all]
-                        save_teams_db() # 変更を保存！
+                        save_teams_db()
                         st.success(f"チーム【{del_team_all}】を削除したよ。")
                         st.rerun()
             else:
@@ -142,7 +140,7 @@ with col1:
             fielding_team = st.selectbox("守備チーム（投手・捕手側）", all_teams, index=default_fielding_idx)
 
         st.markdown("---")
-        st.subheader("🚦 2. 試合状況設定")
+        st.subheader("🚦 2. 状況設定（打席開始時）")
         
         in_col1, in_col2 = st.columns(2)
         with in_col1:
@@ -151,9 +149,7 @@ with col1:
             inning_tb = st.radio("表/裏", ["表", "裏"], horizontal=True)
         inning = f"{inning_num}回{inning_tb}"
         
-        out_count = st.radio("アウトカウント", ["0", "1", "2"], horizontal=True)
-        
-        st.write("ランナー状況")
+        st.write("▼ ランナー状況")
         r_col1, r_col2, r_col3 = st.columns(3)
         with r_col1: r1 = st.checkbox("1塁")
         with r_col2: r2 = st.checkbox("2塁")
@@ -162,13 +158,11 @@ with col1:
         if runner_state == "":
             runner_state = "ランナーなし"
 
-        st.markdown("---")
-        st.subheader("🎯 3. 対戦・投球入力")
-        
         pitcher_list = st.session_state["teams_db"][fielding_team]["投手"]
         catcher_list = st.session_state["teams_db"][fielding_team]["捕手"]
         batter_list = st.session_state["teams_db"][batting_team]["野手"]
         
+        st.write("▼ 選手設定")
         match_col1, match_col2, match_col3 = st.columns(3)
         with match_col1:
             pitcher = st.selectbox("投手（守備側）", pitcher_list if pitcher_list else ["未登録"])
@@ -176,8 +170,20 @@ with col1:
             catcher = st.selectbox("捕手（守備側）", catcher_list if catcher_list else ["未登録"])
         with match_col3:
             batter = st.selectbox("打者（攻撃側）", batter_list if batter_list else ["未登録"])
+
+        st.markdown("---")
+        st.subheader("🎯 3. 対戦・投球入力（1球ごと）")
         
-        # 新しい項目：球速を追加して横並びに
+        st.write("▼ カウント (BSO)")
+        bso1, bso2, bso3 = st.columns(3)
+        with bso1:
+            balls = st.radio("B 🟢", ["0", "1", "2", "3"], horizontal=True)
+        with bso2:
+            strikes = st.radio("S 🟡", ["0", "1", "2"], horizontal=True)
+        with bso3:
+            outs = st.radio("O 🔴", ["0", "1", "2"], horizontal=True)
+        
+        st.write("▼ 投球内容")
         p_col1, p_col2, p_col3 = st.columns(3)
         with p_col1:
             pitch_type = st.selectbox("球種", ["FF(ストレート)", "FT(ツーシーム)", "SL(スライダー)", "FC(カット)", "CU(カーブ)", "FS(フォーク)", "CH(チェンジアップ)", "OT(その他)"])
@@ -224,10 +230,12 @@ with col1:
                 "pitcher": pitcher,
                 "catcher": catcher,
                 "batter": batter,
-                "out-count": out_count,
+                "ball-count": balls,
+                "strike-count": strikes,
+                "out-count": outs,
                 "runners": runner_state,
                 "pitch-type": pitch_type.split("(")[0],
-                "pitch-speed": pitch_speed, # 球速データを追加
+                "pitch-speed": pitch_speed,
                 "location": st.session_state["selected_loc"],
                 "pitch-result": pitch_result.split("(")[0],
                 "memo": memo
@@ -245,8 +253,14 @@ with col2:
         st.write("▼ 直近の投球履歴")
         for idx, row in df.tail(5).iloc[::-1].iterrows():
             inn_str = row['inning'] if 'inning' in row else ''
+            
+            b_val = row['ball-count'] if 'ball-count' in row else '-'
+            s_val = row['strike-count'] if 'strike-count' in row else '-'
+            o_val = row['out-count'] if 'out-count' in row else '-'
+            
             speed_str = f"{row['pitch-speed']}km/h" if 'pitch-speed' in row and pd.notna(row['pitch-speed']) else ""
-            st.info(f"【{inn_str} {row['out-count']}死 {row['runners']}】 {row['fielding-team']}（投:{row['pitcher']}） vs {row['batting-team']}（打:{row['batter']}） ｜ {row['pitch-type']} {speed_str} (コース:{row['location']}) ➡️ {row['pitch-result']} （{row['memo'] if pd.notna(row['memo']) else ''}）")
+            
+            st.info(f"【{inn_str} {o_val}死 {row['runners']} (B{b_val}-S{s_val})】 {row['fielding-team']}（投:{row['pitcher']}） vs {row['batting-team']}（打:{row['batter']}） ｜ {row['pitch-type']} {speed_str} (コース:{row['location']}) ➡️ {row['pitch-result']} （{row['memo'] if pd.notna(row['memo']) else ''}）")
         
         st.markdown("---")
         st.write("▼ データ一覧（最新10件）")
@@ -257,7 +271,7 @@ with col2:
             st.download_button(
                 label="📥 溜まったデータをCSVでダウンロード",
                 data=file,
-                file_name="pitch_log_v5.csv",
+                file_name="pitch_log_v6.csv",
                 mime="text/csv"
             )
     else:
