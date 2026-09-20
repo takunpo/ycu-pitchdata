@@ -189,6 +189,8 @@ with col1:
         st.info("👆 まずは上のメニューから、対戦するチームと選手を登録してください。")
     else:
         st.subheader("🛠️ 1. 試合・チーム設定")
+
+        match_date = st.date_input("試合日", value=datetime.date.today())
         
         team_col1, team_col2 = st.columns(2)
         with team_col1:
@@ -283,7 +285,7 @@ with col1:
         
         if st.button("🚀 この1球を記録する！", type="primary", use_container_width=True):
             new_record = {
-                "date": datetime.date.today(),
+                "date": match_date,
                 "inning": inning,
                 "batting_team": batting_team,
                 "fielding_team": fielding_team,
@@ -336,7 +338,7 @@ with col2:
         st.write("▼ データ一覧（最新50件まで）")
         
         # 編集対象の列を指定
-        display_df = df[['id', 'inning', 'pitcher', 'batter', 'pitch_type', 'pitch_speed', 'pitch_result', 'memo']]
+        display_df = df[['id', 'date', 'inning', 'pitcher', 'batter', 'pitch_type', 'pitch_speed', 'pitch_result', 'memo']]
         
         edited_df = st.data_editor(
             display_df, 
@@ -360,8 +362,12 @@ with col2:
                     # 欠損値(NaN)を除外して辞書化
                     update_data = {k: v for k, v in row.items() if pd.notna(v) and k != 'id'}
                     # 文字列型に強制変換（エラー回避）
+                    # 文字列型に強制変換（エラー回避）
                     if 'pitch_speed' in update_data:
                         update_data['pitch_speed'] = str(update_data['pitch_speed'])
+                    # ▼日付を編集した時用のエラー回避処理を追加▼
+                    if 'date' in update_data and isinstance(update_data['date'], datetime.date):
+                        update_data['date'] = update_data['date'].isoformat()
 
                     supabase.table("pitch_logs").update(update_data).eq("id", row['id']).execute()
                     
