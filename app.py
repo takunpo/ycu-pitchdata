@@ -3,15 +3,30 @@ import pandas as pd
 import datetime
 import os
 import json
+from supabase import create_client, Client
 
-st.set_page_config(layout="wide", page_title="本格派・投球データ入力アプリ")
+st.set_page_config(layout="wide", page_title="投球データ入力アプリ")
 
 # ==========================================
-# 🎨 UIデザインの最適化（縦幅を詰めるCSS）
+# 🚀 Supabase連携の設定
+# ==========================================
+@st.cache_resource
+def init_connection():
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    return create_client(url, key)
+
+try:
+    supabase: Client = init_connection()
+except Exception as e:
+    st.error(f"データベースの接続に失敗しました: {e}")
+    st.stop()
+
+# ==========================================
+# 🎨 UIデザインの最適化
 # ==========================================
 st.markdown("""
 <style>
-/* ラジオボタンのタイトルと選択肢を強制的に横並びにする */
 div[data-testid="stRadio"] {
     display: flex;
     flex-direction: row;
@@ -32,32 +47,50 @@ if "login" not in st.session_state:
     st.session_state["login"] = False
 
 if not st.session_state["login"]:
-    st.title("🔒 パスワードを入力してね")
+    st.title("🔒 パスワードを入力してください")
     pwd = st.text_input("パスワード", type="password")
     if st.button("ログイン"):
         if pwd == "ycujunko": 
             st.session_state["login"] = True
             st.rerun()
         else:
-            st.error("パスワードが違うよ！")
+            st.error("パスワードが違います。")
     st.stop() 
 # ==========================================
 
 st.title("⚾ チーム別フィルタ対応・一球速報システム")
 
-CSV_FILE = "pitch_log_v7.csv"
-DB_FILE = "teams_db.json"
+# ==========================================
+# チーム情報の管理（Supabase対応）
+# ==========================================
+def load_teams_db():
+    try:
+        response = supabase.table("teams_data").select("data").eq("id", 1).execute()
+        if len(response.data) > 0:
+            return response.data[0]["data"]
+        else:
+            return {}
+    except:
+        return {}
+
+def save_teams_db_to_supabase(data_dict):
+    try:
+        # すでにデータがあるか確認
+        check = supabase.table("teams_data").select("id").eq("id", 1).execute()
+        if len(check.data) > 0:
+            # 上書き更新
+            supabase.table("teams_data").update({"data": data_dict}).eq("id", 1).execute()
+        else:
+            # 新規作成
+            supabase.table("teams_data").insert({"id": 1, "data": data_dict}).execute()
+    except Exception as e:
+        st.error(f"チームデータの保存に失敗しました: {e}")
 
 if "teams_db" not in st.session_state:
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            st.session_state["teams_db"] = json.load(f)
-    else:
-        st.session_state["teams_db"] = {}
+    st.session_state["teams_db"] = load_teams_db()
 
 def save_teams_db():
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(st.session_state["teams_db"], f, ensure_ascii=False, indent=4)
+    save_teams_db_to_supabase(st.session_state["teams_db"])
 
 if "selected_loc" not in st.session_state:
     st.session_state["selected_loc"] = "5"
@@ -65,12 +98,18 @@ if "selected_loc" not in st.session_state:
 def update_loc(loc):
     st.session_state["selected_loc"] = loc
 
+# ==========================================
+# 投球データの保存（Supabase対応）
+# ==========================================
 def save_data(new_data):
-    df = pd.DataFrame([new_data])
-    if not os.path.exists(CSV_FILE):
-        df.to_csv(CSV_FILE, index=False, encoding="utf-8-sig")
-    else:
-        df.to_csv(CSV_FILE, mode='a', header=False, index=False, encoding="utf-8-sig")
+    try:
+        # 'date'オブジェクトを文字列に変換
+        if isinstance(new_data.get("date"), datetime.date):
+            new_data["date"] = new_data["date"].isoformat()
+            
+        supabase.table("pitch_logs").insert(new_data).execute()
+    except Exception as e:
+        st.error(f"データの保存に失敗しました: {e}")
 
 col1, col2 = st.columns([1, 1])
 
@@ -86,12 +125,12 @@ with col1:
                     if new_team not in st.session_state["teams_db"]:
                         st.session_state["teams_db"][new_team] = {"投手": [], "捕手": [], "野手": []}
                         save_teams_db()
-                        st.success(f"チーム【{new_team}】を追加したよ！")
+                        st.success(f"チーム【{new_team}】を追加しました。")
                         st.rerun()
                     else:
-                        st.warning("そのチームは既に登録されているよ。")
+                        st.warning("そのチームは既に登録されています。")
                 else:
-                    st.warning("チーム名を入力してね。")
+                    st.warning("チーム名を入力してください。")
 
         all_teams = list(st.session_state["teams_db"].keys())
         
@@ -105,14 +144,14 @@ with col1:
                         if reg_name not in st.session_state["teams_db"][reg_team][reg_position]:
                             st.session_state["teams_db"][reg_team][reg_position].append(reg_name)
                             save_teams_db()
-                            st.success(f"{reg_team}の{reg_position}に【{reg_name}】を追加したよ！")
+                            st.success(f"{reg_team}の{reg_position}に【{reg_name}】を追加しました。")
                             st.rerun()
                         else:
-                            st.warning("その選手は既に登録されているよ。")
+                            st.warning("その選手は既に登録されています。")
                     else:
-                        st.warning("選手名を入力してね。")
+                        st.warning("選手名を入力してください。")
             else:
-                st.info("まずは「チーム追加」タブからチームを登録してね！")
+                st.info("まずは「チーム追加」タブからチームを登録してください。")
 
         with tab3:
             if all_teams:
@@ -128,10 +167,10 @@ with col1:
                         if st.button("この選手を削除する"):
                             st.session_state["teams_db"][del_team][del_position].remove(del_name)
                             save_teams_db()
-                            st.success(f"【{del_name}】を削除したよ。")
+                            st.success(f"【{del_name}】を削除しました。")
                             st.rerun()
                     else:
-                        st.write("このポジションには誰も登録されていないよ。")
+                        st.write("このポジションには誰も登録されていません。")
                         
                 elif del_type == "チームごと削除":
                     del_team_all = st.selectbox("削除するチーム", all_teams, key="del_team_all")
@@ -139,15 +178,15 @@ with col1:
                     if st.button("このチームを完全に削除する"):
                         del st.session_state["teams_db"][del_team_all]
                         save_teams_db()
-                        st.success(f"チーム【{del_team_all}】を削除したよ。")
+                        st.success(f"チーム【{del_team_all}】を削除しました。")
                         st.rerun()
             else:
-                st.info("登録されているデータがないよ。")
-
+                st.info("登録されているデータがありません。")
+                
     st.markdown("---")
     
     if not all_teams:
-        st.info("👆 まずは上のメニューから、対戦するチームと選手を登録してね！")
+        st.info("👆 まずは上のメニューから、対戦するチームと選手を登録してください。")
     else:
         st.subheader("🛠️ 1. 試合・チーム設定")
         
@@ -204,11 +243,11 @@ with col1:
             pitch_type = st.selectbox("球種", ["FF(ストレート)", "FT(ツーシーム)", "SL(スライダー)", "FC(カット)", "CU(カーブ)", "FS(フォーク)", "CH(チェンジアップ)", "OT(その他)"])
         
         with p_col2:
-            # 球速が不明な場合のチェックボックスを追加
-            speed_unknown = st.checkbox("球速不明", value=False)
-            pitch_speed_input = st.number_input("球速 (km/h)", min_value=50, max_value=200, value=130, step=1, disabled=speed_unknown)
-            # チェックが入っている時は空白を記録する
-            final_pitch_speed = "" if speed_unknown else pitch_speed_input
+            speed_container = st.empty() 
+            speed_unknown = st.checkbox("球速不明", value=False) 
+            pitch_speed_input = speed_container.number_input("球速 (km/h)", min_value=50, max_value=200, value=130, step=1, disabled=speed_unknown)
+            
+            final_pitch_speed = "" if speed_unknown else str(pitch_speed_input)
 
         with p_col3:
             pitch_result = st.selectbox("投球結果", ["S(見逃し)", "SS(空振り)", "B(ボール)", "F(ファウル)", "BIP(インプレー)"])
@@ -246,67 +285,90 @@ with col1:
             new_record = {
                 "date": datetime.date.today(),
                 "inning": inning,
-                "batting-team": batting_team,
-                "fielding-team": fielding_team,
+                "batting_team": batting_team,
+                "fielding_team": fielding_team,
                 "pitcher": pitcher,
                 "catcher": catcher,
                 "batter": batter,
-                "ball-count": balls,
-                "strike-count": strikes,
-                "out-count": outs,
+                "ball_count": balls,
+                "strike_count": strikes,
+                "out_count": outs,
                 "runners": runner_state,
-                "pitch-type": pitch_type.split("(")[0],
-                "pitch-speed": final_pitch_speed,
+                "pitch_type": pitch_type.split("(")[0],
+                "pitch_speed": final_pitch_speed,
                 "location": st.session_state["selected_loc"],
-                "pitch-result": pitch_result.split("(")[0],
+                "pitch_result": pitch_result.split("(")[0],
                 "memo": memo
             }
             save_data(new_record)
-            st.success("記録したよ！")
+            st.success("データベースに記録しました。")
             st.rerun()
 
 with col2:
     st.subheader("📊 リアルタイム一球速報ログ")
     
-    if os.path.exists(CSV_FILE):
-        df = pd.read_csv(CSV_FILE)
+    # Supabaseからデータを取得して表示
+    try:
+        response = supabase.table("pitch_logs").select("*").order("id", desc=True).limit(50).execute()
+        db_data = response.data
+    except Exception as e:
+        st.error(f"データの読み込みに失敗しました: {e}")
+        db_data = []
+    
+    if len(db_data) > 0:
+        df = pd.DataFrame(db_data)
         
         st.write("▼ 直近の投球履歴")
-        for idx, row in df.tail(5).iloc[::-1].iterrows():
-            inn_str = row['inning'] if 'inning' in row else ''
-            b_val = row['ball-count'] if 'ball-count' in row else '-'
-            s_val = row['strike-count'] if 'strike-count' in row else '-'
-            o_val = row['out-count'] if 'out-count' in row else '-'
+        for idx, row in df.head(5).iterrows():
+            inn_str = row.get('inning', '')
+            b_val = row.get('ball_count', '-')
+            s_val = row.get('strike_count', '-')
+            o_val = row.get('out_count', '-')
             
-            speed_val = row['pitch-speed']
-            speed_str = f"{int(speed_val)}km/h" if pd.notna(speed_val) and str(speed_val).strip() != "" else "速度不明"
-            memo_str = f"（{row['memo']}）" if pd.notna(row['memo']) and str(row['memo']).strip() != "" else ""
+            speed_val = row.get('pitch_speed', '')
+            speed_str = f"{speed_val}km/h" if speed_val else "速度不明"
+            memo_val = row.get('memo', '')
+            memo_str = f"（{memo_val}）" if memo_val else ""
             
-            st.info(f"【{inn_str} {o_val}死 {row['runners']} (B{b_val}-S{s_val})】 {row['fielding-team']}（投:{row['pitcher']}） vs {row['batting-team']}（打:{row['batter']}） ｜ {row['pitch-type']} {speed_str} (コース:{row['location']}) ➡️ {row['pitch-result']} {memo_str}")
+            st.info(f"【{inn_str} {o_val}死 {row.get('runners','')} (B{b_val}-S{s_val})】 {row.get('fielding_team','')}（投:{row.get('pitcher','')}） vs {row.get('batting_team','')}（打:{row.get('batter','')}） ｜ {row.get('pitch_type','')} {speed_str} (コース:{row.get('location','')}) ➡️ {row.get('pitch_result','')} {memo_str}")
         
         st.markdown("---")
-        st.write("▼ データ一覧（直接セルをクリックして編集できるよ）")
+        st.write("▼ データ一覧（最新50件まで）")
         
-        # 編集しやすいように新しいデータを上にしてエディターに渡す
-        df_reversed = df.iloc[::-1].reset_index(drop=True)
+        # 編集対象の列を指定
+        display_df = df[['id', 'inning', 'pitcher', 'batter', 'pitch_type', 'pitch_speed', 'pitch_result', 'memo']]
         
-        # num_rows="dynamic" で行の追加や削除（左端のチェックボックスで選択してDeleteキー）も可能になる
-        edited_df_reversed = st.data_editor(df_reversed, num_rows="dynamic", use_container_width=True)
+        edited_df = st.data_editor(
+            display_df, 
+            num_rows="dynamic",
+            use_container_width=True,
+            disabled=["id"] # id列は変更できないようにロック
+        )
         
-        if st.button("💾 編集内容を保存する"):
-            # 保存する時は元の順番（古いものが上）に戻す
-            final_df = edited_df_reversed.iloc[::-1].reset_index(drop=True)
-            final_df.to_csv(CSV_FILE, index=False, encoding="utf-8-sig")
-            st.success("データの変更を保存したよ！")
-            st.rerun()
+        if st.button("💾 編集内容をデータベースに保存する"):
+            try:
+                # 削除された行の処理
+                original_ids = set(df['id'])
+                edited_ids = set(edited_df['id'].dropna())
+                deleted_ids = original_ids - edited_ids
+                
+                for del_id in deleted_ids:
+                    supabase.table("pitch_logs").delete().eq("id", del_id).execute()
+                
+                # 更新された行の処理
+                for idx, row in edited_df.iterrows():
+                    # 欠損値(NaN)を除外して辞書化
+                    update_data = {k: v for k, v in row.items() if pd.notna(v) and k != 'id'}
+                    # 文字列型に強制変換（エラー回避）
+                    if 'pitch_speed' in update_data:
+                        update_data['pitch_speed'] = str(update_data['pitch_speed'])
+
+                    supabase.table("pitch_logs").update(update_data).eq("id", row['id']).execute()
+                    
+                st.success("データベースの変更を保存しました。")
+                st.rerun()
+            except Exception as e:
+                st.error(f"保存中にエラーが起きました: {e}")
             
-        st.markdown("---")
-        with open(CSV_FILE, "rb") as file:
-            st.download_button(
-                label="📥 溜まったデータをCSVでダウンロード",
-                data=file,
-                file_name="pitch_log_v7.csv",
-                mime="text/csv"
-            )
     else:
-        st.info("まだデータがないよ。左の画面から最初の1球を入力してみてね！")
+        st.info("データベースは空っぽです。最初の1球を入力してください。")
