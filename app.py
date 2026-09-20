@@ -4,7 +4,7 @@ import datetime
 import os
 import json
 
-st.set_page_config(layout="wide", page_title="投球データ入力アプリ")
+st.set_page_config(layout="wide", page_title="本格派・投球データ入力アプリ")
 
 # ==========================================
 # 🎨 UIデザインの最適化（縦幅を詰めるCSS）
@@ -20,7 +20,7 @@ div[data-testid="stRadio"] {
 div[data-testid="stRadio"] > label {
     margin-bottom: 0px !important;
     margin-right: 15px;
-    min-width: 65px; /* B 🟢 などの文字幅を揃えて縦のラインを綺麗にする */
+    min-width: 65px; 
 }
 </style>
 """, unsafe_allow_html=True)
@@ -43,9 +43,9 @@ if not st.session_state["login"]:
     st.stop() 
 # ==========================================
 
-st.title("⚾ 一球速報システム")
+st.title("⚾ チーム別フィルタ対応・一球速報システム")
 
-CSV_FILE = "pitch_log_v6.csv"
+CSV_FILE = "pitch_log_v7.csv"
 DB_FILE = "teams_db.json"
 
 if "teams_db" not in st.session_state:
@@ -202,8 +202,14 @@ with col1:
         p_col1, p_col2, p_col3 = st.columns(3)
         with p_col1:
             pitch_type = st.selectbox("球種", ["FF(ストレート)", "FT(ツーシーム)", "SL(スライダー)", "FC(カット)", "CU(カーブ)", "FS(フォーク)", "CH(チェンジアップ)", "OT(その他)"])
+        
         with p_col2:
-            pitch_speed = st.number_input("球速 (km/h)", min_value=50, max_value=200, value=130, step=1)
+            # 球速が不明な場合のチェックボックスを追加
+            speed_unknown = st.checkbox("球速不明", value=False)
+            pitch_speed_input = st.number_input("球速 (km/h)", min_value=50, max_value=200, value=130, step=1, disabled=speed_unknown)
+            # チェックが入っている時は空白を記録する
+            final_pitch_speed = "" if speed_unknown else pitch_speed_input
+
         with p_col3:
             pitch_result = st.selectbox("投球結果", ["S(見逃し)", "SS(空振り)", "B(ボール)", "F(ファウル)", "BIP(インプレー)"])
         
@@ -250,7 +256,7 @@ with col1:
                 "out-count": outs,
                 "runners": runner_state,
                 "pitch-type": pitch_type.split("(")[0],
-                "pitch-speed": pitch_speed,
+                "pitch-speed": final_pitch_speed,
                 "location": st.session_state["selected_loc"],
                 "pitch-result": pitch_result.split("(")[0],
                 "memo": memo
@@ -268,25 +274,38 @@ with col2:
         st.write("▼ 直近の投球履歴")
         for idx, row in df.tail(5).iloc[::-1].iterrows():
             inn_str = row['inning'] if 'inning' in row else ''
-            
             b_val = row['ball-count'] if 'ball-count' in row else '-'
             s_val = row['strike-count'] if 'strike-count' in row else '-'
             o_val = row['out-count'] if 'out-count' in row else '-'
             
-            speed_str = f"{row['pitch-speed']}km/h" if 'pitch-speed' in row and pd.notna(row['pitch-speed']) else ""
+            speed_val = row['pitch-speed']
+            speed_str = f"{int(speed_val)}km/h" if pd.notna(speed_val) and str(speed_val).strip() != "" else "速度不明"
+            memo_str = f"（{row['memo']}）" if pd.notna(row['memo']) and str(row['memo']).strip() != "" else ""
             
-            st.info(f"【{inn_str} {o_val}死 {row['runners']} (B{b_val}-S{s_val})】 {row['fielding-team']}（投:{row['pitcher']}） vs {row['batting-team']}（打:{row['batter']}） ｜ {row['pitch-type']} {speed_str} (コース:{row['location']}) ➡️ {row['pitch-result']} （{row['memo'] if pd.notna(row['memo']) else ''}）")
+            st.info(f"【{inn_str} {o_val}死 {row['runners']} (B{b_val}-S{s_val})】 {row['fielding-team']}（投:{row['pitcher']}） vs {row['batting-team']}（打:{row['batter']}） ｜ {row['pitch-type']} {speed_str} (コース:{row['location']}) ➡️ {row['pitch-result']} {memo_str}")
         
         st.markdown("---")
-        st.write("▼ データ一覧（最新10件）")
-        st.dataframe(df.tail(10).iloc[::-1], use_container_width=True)
+        st.write("▼ データ一覧（直接セルをクリックして編集できるよ）")
         
+        # 編集しやすいように新しいデータを上にしてエディターに渡す
+        df_reversed = df.iloc[::-1].reset_index(drop=True)
+        
+        # num_rows="dynamic" で行の追加や削除（左端のチェックボックスで選択してDeleteキー）も可能になる
+        edited_df_reversed = st.data_editor(df_reversed, num_rows="dynamic", use_container_width=True)
+        
+        if st.button("💾 編集内容を保存する"):
+            # 保存する時は元の順番（古いものが上）に戻す
+            final_df = edited_df_reversed.iloc[::-1].reset_index(drop=True)
+            final_df.to_csv(CSV_FILE, index=False, encoding="utf-8-sig")
+            st.success("データの変更を保存したよ！")
+            st.rerun()
+            
         st.markdown("---")
         with open(CSV_FILE, "rb") as file:
             st.download_button(
                 label="📥 溜まったデータをCSVでダウンロード",
                 data=file,
-                file_name="pitch_log_v6.csv",
+                file_name="pitch_log_v7.csv",
                 mime="text/csv"
             )
     else:
