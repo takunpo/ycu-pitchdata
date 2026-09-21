@@ -202,12 +202,8 @@ with col1:
         st.markdown("---")
         st.subheader("🚦 2. 状況設定（打席開始時）")
         
-        in_col1, in_col2 = st.columns(2)
-        with in_col1:
-            inning_num = st.number_input("イニング", min_value=1, max_value=12, value=1)
-        with in_col2:
-            inning_tb = st.radio("表/裏", ["表", "裏"], horizontal=True)
-        inning = f"{inning_num}回{inning_tb}"
+        inning_num = st.number_input("イニング", min_value=1, max_value=12, value=1)
+        inning = f"{inning_num}回"
         
         st.write("▼ ランナー状況")
         r_col1, r_col2, r_col3 = st.columns(3)
