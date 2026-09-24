@@ -203,7 +203,7 @@ with col1:
         st.subheader("🚦 2. 状況設定（打席開始時）")
         
         inning_num = st.number_input("イニング", min_value=1, max_value=12, value=1)
-        inning = f"{inning_num}回"
+        inning = str(inning)
         
         st.write("▼ ランナー状況")
         r_col1, r_col2, r_col3 = st.columns(3)
